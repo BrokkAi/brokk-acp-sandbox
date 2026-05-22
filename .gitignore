@@ -1,0 +1,21 @@
+# Rust build artifacts
+/target/
+
+# The committed `wasm/brokk-acp-sandbox.wasm` is the publishable
+# release artifact and is checked in deliberately. (No `*.wasm`
+# catch-all rule — we want git to track that one file.)
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment / secrets
+.env
+.env.*

@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [ 'master' ]
+  pull_request:
+    branches: [ 'master' ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          # Needed for the wasm-builds-from-source check below: the
+          # crate ships a pre-built `wasm/brokk-acp-sandbox.wasm` as
+          # its published artifact, so a change that compiles natively
+          # but breaks `wasm32-wasip2` must fail PR review.
+          targets: wasm32-wasip2
+
+      - name: Cache cargo registry and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Check Rust formatting
+        run: cargo fmt --check
+
+      - name: Run Clippy lints
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Run tests
+        run: cargo test
+
+      # The published artifact is `wasm/brokk-acp-sandbox.wasm`, which
+      # is committed and shipped via `pub const WASM_BYTES`. Verify
+      # that the current source still cross-compiles to
+      # `wasm32-wasip2`. We don't byte-diff against the committed
+      # artifact (release builds aren't bit-reproducible across runners
+      # without pinning everything), but a build failure here is a
+      # clear "rebuild and re-commit the wasm before tagging" signal.
+      - name: Build sandbox for wasm32-wasip2
+        run: cargo build --release --bin brokk-acp-sandbox --target wasm32-wasip2
