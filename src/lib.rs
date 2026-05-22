@@ -28,3 +28,14 @@ pub use zip_reader::{
     read_entries_with_prefix as read_zip_entries_with_prefix,
     read_entry_bytes as read_zip_entry_bytes, read_entry_text as read_zip_entry_text,
 };
+
+/// Bytes of the `wasm32-wasip2` binary form of this crate. The host
+/// embeds these in wasmtime to run the same parsers inside a sandbox.
+/// Shipped as a committed artifact (see `wasm/brokk-acp-sandbox.wasm`)
+/// so consumers do not need the wasm toolchain to build against this
+/// crate.
+///
+/// Rebuild and re-commit when this crate's source changes:
+/// `cargo build --release --bin brokk-acp-sandbox --target wasm32-wasip2`
+/// then copy the artifact to `wasm/brokk-acp-sandbox.wasm`.
+pub const WASM_BYTES: &[u8] = include_bytes!("../wasm/brokk-acp-sandbox.wasm");

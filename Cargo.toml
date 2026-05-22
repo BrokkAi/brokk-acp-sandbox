@@ -2,8 +2,21 @@
 name = "brokk-acp-sandbox"
 version = "0.1.0"
 edition = "2024"
-description = "Pure-parsing logic for brokk-acp-rust that runs either natively (linked as a library) or inside a wasmtime-hosted WASI sandbox (built as the `brokk-acp-sandbox` binary). The wasm path gives memory/crash/CPU isolation around untrusted YAML, zip, and regex inputs without losing the ability to fall back to native for performance."
-license = "LGPL-3.0"
+description = "Pure-parsing logic for brokk-anvil that runs either natively (linked as a library) or inside a wasmtime-hosted WASI sandbox (built as the `brokk-acp-sandbox` binary). The wasm path gives memory/crash/CPU isolation around untrusted YAML, zip, and regex inputs without losing the ability to fall back to native for performance."
+license = "LGPL-3.0-only"
+repository = "https://github.com/BrokkAi/anvil"
+homepage = "https://github.com/BrokkAi/anvil"
+documentation = "https://docs.rs/brokk-acp-sandbox"
+keywords = ["sandbox", "wasm", "wasi", "parser", "brokk"]
+categories = ["parser-implementations", "wasm"]
+include = [
+    "src/**/*.rs",
+    "wasm/brokk-acp-sandbox.wasm",
+    "Cargo.toml",
+    "LICENSE",
+    "LICENSE.GPL",
+    "README.md",
+]
 
 # Both a library (linked into the native brokk-acp binary) and a binary
 # (compiled to `wasm32-wasip2`, embedded via `include_bytes!` and run
