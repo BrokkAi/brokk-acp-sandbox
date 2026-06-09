@@ -19,10 +19,17 @@
 
 pub mod search;
 pub mod skills;
+pub mod toolbox;
 pub mod zip_reader;
 
 pub use search::{SearchError, SearchMatch, SearchOutcome, search as search_file_contents};
 pub use skills::{ParsedFrontmatter, parse_frontmatter, split_frontmatter};
+pub use toolbox::{
+    TOOLBOX_DEFAULT_MAX_COPY_BYTES, TOOLBOX_DEFAULT_MAX_FIND_RESULTS,
+    TOOLBOX_DEFAULT_MAX_LIST_ENTRIES, TOOLBOX_DEFAULT_MAX_MUTATION_ENTRIES,
+    TOOLBOX_DEFAULT_MAX_READ_BYTES, ToolboxError, WordCount, WorkspaceCommand,
+    WorkspaceCommandOutput, WorkspaceEntry, WorkspaceEntryKind, run_workspace_command,
+};
 pub use zip_reader::{
     ZipReadError, list_entry_names as list_zip_entry_names,
     read_entries_with_prefix as read_zip_entries_with_prefix,

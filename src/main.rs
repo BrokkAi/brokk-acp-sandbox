@@ -95,6 +95,15 @@ enum Request {
         max_file_bytes: u64,
         max_total_bytes: u64,
     },
+    /// Run one typed shell-like workspace command under the preopened
+    /// directory at `guest_root`. The request is structured as a
+    /// tagged enum rather than raw shell text, so quoting, pipes,
+    /// redirects, subshells, and shell control operators are not part
+    /// of the contract.
+    RunWorkspaceCommand {
+        guest_root: String,
+        command: brokk_acp_sandbox::WorkspaceCommand,
+    },
 }
 
 #[derive(Deserialize)]
@@ -364,6 +373,19 @@ fn main() -> anyhow::Result<()> {
                 max_total_bytes,
             ) {
                 Ok(outcome) => serde_json::to_string(&OkResponse { id, ok: &outcome })?,
+                Err(err) => {
+                    let body = err.to_string();
+                    serde_json::to_string(&ErrResponse { id, err: &body })?
+                }
+            },
+            Request::RunWorkspaceCommand {
+                guest_root,
+                command,
+            } => match brokk_acp_sandbox::run_workspace_command(
+                std::path::Path::new(&guest_root),
+                &command,
+            ) {
+                Ok(output) => serde_json::to_string(&OkResponse { id, ok: &output })?,
                 Err(err) => {
                     let body = err.to_string();
                     serde_json::to_string(&ErrResponse { id, err: &body })?
