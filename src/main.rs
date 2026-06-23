@@ -101,6 +101,7 @@ enum Request {
     /// redirects, subshells, and shell control operators are not part
     /// of the contract.
     RunWorkspaceCommand {
+        #[serde(alias = "guestRoot")]
         guest_root: String,
         command: brokk_acp_sandbox::WorkspaceCommand,
     },
@@ -396,4 +397,29 @@ fn main() -> anyhow::Result<()> {
         out.flush()?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn run_workspace_command_accepts_camel_case_guest_root() {
+        let envelope: Envelope = serde_json::from_str(
+            r#"{"id":7,"method":"runWorkspaceCommand","params":{"guestRoot":"/workspace","command":{"command":"pwd"}}}"#,
+        )
+        .unwrap();
+
+        match envelope.req {
+            Request::RunWorkspaceCommand {
+                guest_root,
+                command,
+            } => {
+                assert_eq!(envelope.id, 7);
+                assert_eq!(guest_root, "/workspace");
+                assert_eq!(command, brokk_acp_sandbox::WorkspaceCommand::Pwd);
+            }
+            _ => panic!("unexpected request variant"),
+        }
+    }
 }

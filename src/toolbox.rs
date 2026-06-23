@@ -17,7 +17,11 @@ pub const TOOLBOX_DEFAULT_MAX_COPY_BYTES: u64 = 64 * 1024 * 1024;
 pub const TOOLBOX_DEFAULT_MAX_MUTATION_ENTRIES: usize = 2048;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(tag = "command", rename_all = "camelCase")]
+#[serde(
+    tag = "command",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum WorkspaceCommand {
     Pwd,
     Ls {
@@ -27,33 +31,41 @@ pub enum WorkspaceCommand {
     },
     Cat {
         path: String,
+        #[serde(alias = "max_bytes")]
         max_bytes: Option<u64>,
     },
     Head {
         path: String,
         lines: usize,
+        #[serde(alias = "max_bytes")]
         max_bytes: Option<u64>,
     },
     Tail {
         path: String,
         lines: usize,
+        #[serde(alias = "max_bytes")]
         max_bytes: Option<u64>,
     },
     Wc {
         path: String,
+        #[serde(alias = "max_bytes")]
         max_bytes: Option<u64>,
     },
     Find {
         path: Option<String>,
         glob: Option<String>,
+        #[serde(alias = "max_results")]
         max_results: Option<usize>,
     },
     Grep {
         path: Option<String>,
         pattern: String,
         glob: Option<String>,
+        #[serde(alias = "max_results")]
         max_results: usize,
+        #[serde(alias = "max_file_bytes")]
         max_file_bytes: u64,
+        #[serde(alias = "max_total_bytes")]
         max_total_bytes: u64,
     },
     Mkdir {
@@ -65,7 +77,9 @@ pub enum WorkspaceCommand {
         destination: String,
         recursive: bool,
         overwrite: bool,
+        #[serde(alias = "max_total_bytes")]
         max_total_bytes: Option<u64>,
+        #[serde(alias = "max_entries")]
         max_entries: Option<usize>,
     },
     Mv {
@@ -76,6 +90,7 @@ pub enum WorkspaceCommand {
     Rm {
         path: String,
         recursive: bool,
+        #[serde(alias = "max_entries")]
         max_entries: Option<usize>,
     },
 }
@@ -103,7 +118,11 @@ pub struct WordCount {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(tag = "kind", rename_all = "camelCase")]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum WorkspaceCommandOutput {
     Pwd {
         path: String,
@@ -184,6 +203,22 @@ impl From<SearchError> for ToolboxError {
     }
 }
 
+fn optional_u64_limit(requested: Option<u64>, max: u64) -> u64 {
+    requested.unwrap_or(max).min(max)
+}
+
+fn required_u64_limit(requested: u64, max: u64) -> u64 {
+    requested.min(max)
+}
+
+fn optional_usize_limit(requested: Option<usize>, max: usize) -> usize {
+    requested.unwrap_or(max).min(max)
+}
+
+fn required_usize_limit(requested: usize, max: usize) -> usize {
+    requested.min(max)
+}
+
 pub fn run_workspace_command(
     root: &Path,
     command: &WorkspaceCommand,
@@ -203,7 +238,7 @@ pub fn run_workspace_command(
                 &root,
                 &path,
                 *recursive,
-                max_entries.unwrap_or(TOOLBOX_DEFAULT_MAX_LIST_ENTRIES),
+                optional_usize_limit(*max_entries, TOOLBOX_DEFAULT_MAX_LIST_ENTRIES),
             )?;
             Ok(WorkspaceCommandOutput::Ls { entries, truncated })
         }
@@ -211,7 +246,7 @@ pub fn run_workspace_command(
             let content = read_text_file(
                 &root,
                 path,
-                max_bytes.unwrap_or(TOOLBOX_DEFAULT_MAX_READ_BYTES),
+                optional_u64_limit(*max_bytes, TOOLBOX_DEFAULT_MAX_READ_BYTES),
             )?;
             Ok(WorkspaceCommandOutput::Cat { content })
         }
@@ -223,7 +258,7 @@ pub fn run_workspace_command(
             let content = read_text_file(
                 &root,
                 path,
-                max_bytes.unwrap_or(TOOLBOX_DEFAULT_MAX_READ_BYTES),
+                optional_u64_limit(*max_bytes, TOOLBOX_DEFAULT_MAX_READ_BYTES),
             )?;
             Ok(WorkspaceCommandOutput::Head {
                 content: head_lines(&content, *lines),
@@ -237,7 +272,7 @@ pub fn run_workspace_command(
             let content = read_text_file(
                 &root,
                 path,
-                max_bytes.unwrap_or(TOOLBOX_DEFAULT_MAX_READ_BYTES),
+                optional_u64_limit(*max_bytes, TOOLBOX_DEFAULT_MAX_READ_BYTES),
             )?;
             Ok(WorkspaceCommandOutput::Tail {
                 content: tail_lines(&content, *lines),
@@ -247,7 +282,7 @@ pub fn run_workspace_command(
             let content = read_text_file(
                 &root,
                 path,
-                max_bytes.unwrap_or(TOOLBOX_DEFAULT_MAX_READ_BYTES),
+                optional_u64_limit(*max_bytes, TOOLBOX_DEFAULT_MAX_READ_BYTES),
             )?;
             Ok(WorkspaceCommandOutput::Wc {
                 counts: WordCount {
@@ -268,7 +303,7 @@ pub fn run_workspace_command(
                 &root,
                 &path,
                 glob.as_deref(),
-                max_results.unwrap_or(TOOLBOX_DEFAULT_MAX_FIND_RESULTS),
+                optional_usize_limit(*max_results, TOOLBOX_DEFAULT_MAX_FIND_RESULTS),
             )?;
             Ok(WorkspaceCommandOutput::Find { paths, truncated })
         }
@@ -286,9 +321,15 @@ pub fn run_workspace_command(
                 &target,
                 pattern,
                 glob.as_deref(),
-                *max_results,
-                *max_file_bytes,
-                *max_total_bytes,
+                required_usize_limit(*max_results, TOOLBOX_DEFAULT_MAX_FIND_RESULTS),
+                required_u64_limit(
+                    *max_file_bytes,
+                    crate::search::SEARCH_DEFAULT_MAX_FILE_BYTES,
+                ),
+                required_u64_limit(
+                    *max_total_bytes,
+                    crate::search::SEARCH_DEFAULT_MAX_TOTAL_BYTES,
+                ),
             )?;
             Ok(WorkspaceCommandOutput::Grep {
                 matches: outcome.matches,
@@ -296,7 +337,7 @@ pub fn run_workspace_command(
             })
         }
         WorkspaceCommand::Mkdir { path, parents } => {
-            let target = resolve_new_path(&root, path, true)?;
+            let target = resolve_new_path(&root, path, !*parents)?;
             if target.exists() {
                 return Err(ToolboxError::AlreadyExists(path.clone()));
             }
@@ -326,8 +367,8 @@ pub fn run_workspace_command(
                 &destination_path,
                 *recursive,
                 *overwrite,
-                max_total_bytes.unwrap_or(TOOLBOX_DEFAULT_MAX_COPY_BYTES),
-                max_entries.unwrap_or(TOOLBOX_DEFAULT_MAX_MUTATION_ENTRIES),
+                optional_u64_limit(*max_total_bytes, TOOLBOX_DEFAULT_MAX_COPY_BYTES),
+                optional_usize_limit(*max_entries, TOOLBOX_DEFAULT_MAX_MUTATION_ENTRIES),
             )?;
             Ok(WorkspaceCommandOutput::Mutation {
                 action: "cp".to_string(),
@@ -361,7 +402,7 @@ pub fn run_workspace_command(
             remove_path(
                 &target,
                 *recursive,
-                max_entries.unwrap_or(TOOLBOX_DEFAULT_MAX_MUTATION_ENTRIES),
+                optional_usize_limit(*max_entries, TOOLBOX_DEFAULT_MAX_MUTATION_ENTRIES),
             )?;
             Ok(WorkspaceCommandOutput::Mutation {
                 action: "rm".to_string(),
@@ -490,8 +531,11 @@ fn list_directory(
     recursive: bool,
     max_entries: usize,
 ) -> Result<(Vec<WorkspaceEntry>, bool), ToolboxError> {
+    if max_entries == 0 {
+        return Ok((Vec::new(), true));
+    }
     if target.is_file() {
-        return Ok((vec![workspace_entry(root, target)?], false));
+        return Ok((workspace_entry(root, target)?.into_iter().collect(), false));
     }
     if !target.is_dir() {
         return Err(ToolboxError::NotADirectory(target.display().to_string()));
@@ -505,19 +549,23 @@ fn list_directory(
             .into_iter()
             .flatten()
         {
-            entries.push(workspace_entry(root, entry.path())?);
-            if entries.len() >= max_entries {
-                truncated = true;
-                break;
+            if let Some(entry) = workspace_entry(root, entry.path())? {
+                entries.push(entry);
+                if entries.len() >= max_entries {
+                    truncated = true;
+                    break;
+                }
             }
         }
     } else {
         for entry in std::fs::read_dir(target).map_err(io_error)? {
             let entry = entry.map_err(io_error)?;
-            entries.push(workspace_entry(root, &entry.path())?);
-            if entries.len() >= max_entries {
-                truncated = true;
-                break;
+            if let Some(entry) = workspace_entry(root, &entry.path())? {
+                entries.push(entry);
+                if entries.len() >= max_entries {
+                    truncated = true;
+                    break;
+                }
             }
         }
     }
@@ -525,8 +573,11 @@ fn list_directory(
     Ok((entries, truncated))
 }
 
-fn workspace_entry(root: &Path, path: &Path) -> Result<WorkspaceEntry, ToolboxError> {
-    let meta = path.metadata().map_err(io_error)?;
+fn workspace_entry(root: &Path, path: &Path) -> Result<Option<WorkspaceEntry>, ToolboxError> {
+    let meta = path.symlink_metadata().map_err(io_error)?;
+    if meta.file_type().is_symlink() {
+        return Ok(None);
+    }
     let kind = if meta.is_dir() {
         WorkspaceEntryKind::Directory
     } else if meta.is_file() {
@@ -537,14 +588,14 @@ fn workspace_entry(root: &Path, path: &Path) -> Result<WorkspaceEntry, ToolboxEr
             path.display()
         )));
     };
-    Ok(WorkspaceEntry {
+    Ok(Some(WorkspaceEntry {
         path: path_to_display(root, path),
         kind: kind.clone(),
         size_bytes: match kind {
             WorkspaceEntryKind::File => Some(meta.len()),
             WorkspaceEntryKind::Directory => None,
         },
-    })
+    }))
 }
 
 fn read_text_file(root: &Path, path: &str, max_bytes: u64) -> Result<String, ToolboxError> {
@@ -581,6 +632,9 @@ fn find_paths(
     glob: Option<&str>,
     max_results: usize,
 ) -> Result<(Vec<String>, bool), ToolboxError> {
+    if max_results == 0 {
+        return Ok((Vec::new(), true));
+    }
     let glob_re = match glob {
         Some(pattern) => Some(compile_glob(pattern)?),
         None => None,
@@ -625,11 +679,26 @@ fn grep_path(
     max_file_bytes: u64,
     max_total_bytes: u64,
 ) -> Result<crate::SearchOutcome, ToolboxError> {
+    if max_results == 0 {
+        return Ok(crate::SearchOutcome {
+            matches: Vec::new(),
+            truncated: true,
+        });
+    }
     if target.is_file() {
+        let rel_path = path_to_display(root, target);
+        if let Some(glob) = glob {
+            let glob_re = compile_glob(glob)?;
+            if !glob_re.is_match(&rel_path) {
+                return Ok(crate::SearchOutcome {
+                    matches: Vec::new(),
+                    truncated: false,
+                });
+            }
+        }
         let re = Regex::new(pattern)
             .map_err(|err| ToolboxError::Search(SearchError::InvalidRegex(err.to_string())))?;
-        let content = read_text_file(root, &path_to_display(root, target), max_file_bytes)?;
-        let rel_path = path_to_display(root, target);
+        let content = read_text_file(root, &rel_path, max_file_bytes)?;
         let mut matches = Vec::new();
         for (idx, line) in content.lines().enumerate() {
             if re.is_match(line) {
@@ -652,15 +721,30 @@ fn grep_path(
         });
     }
 
-    search_file_contents(
+    let mut outcome = search_file_contents(
         target,
         pattern,
-        glob,
+        None,
         max_results,
         max_file_bytes,
         max_total_bytes,
     )
-    .map_err(Into::into)
+    .map_err(ToolboxError::from)?;
+
+    let target_prefix = path_to_display(root, target);
+    let glob_re = match glob {
+        Some(pattern) => Some(compile_glob(pattern)?),
+        None => None,
+    };
+    for item in &mut outcome.matches {
+        if target_prefix != "." {
+            item.path = format!("{target_prefix}/{}", item.path);
+        }
+    }
+    outcome
+        .matches
+        .retain(|item| glob_re.as_ref().is_none_or(|re| re.is_match(&item.path)));
+    Ok(outcome)
 }
 
 fn resolve_copy_move_destination(
@@ -693,6 +777,17 @@ fn copy_path(
     max_entries: usize,
 ) -> Result<(), ToolboxError> {
     if source.is_file() {
+        if max_entries == 0 {
+            return Err(ToolboxError::TooLarge(
+                "copy exceeded 0 file entries".to_string(),
+            ));
+        }
+        let meta = source.metadata().map_err(io_error)?;
+        if meta.len() > max_total_bytes {
+            return Err(ToolboxError::TooLarge(format!(
+                "copy exceeded {max_total_bytes} bytes"
+            )));
+        }
         copy_file(source, destination, overwrite)?;
         return Ok(());
     }
@@ -782,6 +877,16 @@ fn move_path(
     destination: &Path,
     overwrite: bool,
 ) -> Result<(), ToolboxError> {
+    if source == destination {
+        return Err(ToolboxError::InvalidArgument(
+            "refusing to move a path onto itself".to_string(),
+        ));
+    }
+    if source.is_dir() && destination.starts_with(source) {
+        return Err(ToolboxError::InvalidArgument(
+            "refusing to move a directory into itself".to_string(),
+        ));
+    }
     if destination.exists() {
         if !overwrite {
             return Err(ToolboxError::AlreadyExists(path_to_display(
@@ -1049,5 +1154,181 @@ mod tests {
         assert!(matches!(err, ToolboxError::PathEscapesWorkspace(_)));
 
         std::fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn mkdir_parents_creates_missing_ancestors() {
+        let root = temp_workspace("mkdir-parents");
+
+        run_workspace_command(
+            &root,
+            &WorkspaceCommand::Mkdir {
+                path: "a/b/c".to_string(),
+                parents: true,
+            },
+        )
+        .unwrap();
+
+        assert!(root.join("a/b/c").is_dir());
+        std::fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn file_copy_respects_byte_and_entry_limits() {
+        let root = temp_workspace("copy-limits");
+        std::fs::write(root.join("big.txt"), "0123456789").unwrap();
+
+        let err = run_workspace_command(
+            &root,
+            &WorkspaceCommand::Cp {
+                source: "big.txt".to_string(),
+                destination: "copy.txt".to_string(),
+                recursive: false,
+                overwrite: false,
+                max_total_bytes: Some(4),
+                max_entries: None,
+            },
+        )
+        .unwrap_err();
+        assert!(matches!(err, ToolboxError::TooLarge(_)));
+        assert!(!root.join("copy.txt").exists());
+
+        let err = run_workspace_command(
+            &root,
+            &WorkspaceCommand::Cp {
+                source: "big.txt".to_string(),
+                destination: "copy.txt".to_string(),
+                recursive: false,
+                overwrite: false,
+                max_total_bytes: None,
+                max_entries: Some(0),
+            },
+        )
+        .unwrap_err();
+        assert!(matches!(err, ToolboxError::TooLarge(_)));
+        assert!(!root.join("copy.txt").exists());
+
+        std::fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn move_directory_into_itself_does_not_delete_destination() {
+        let root = temp_workspace("move-into-self");
+        std::fs::create_dir_all(root.join("a")).unwrap();
+        std::fs::write(root.join("a/file.txt"), "keep me").unwrap();
+
+        let err = run_workspace_command(
+            &root,
+            &WorkspaceCommand::Mv {
+                source: "a".to_string(),
+                destination: "a/file.txt".to_string(),
+                overwrite: true,
+            },
+        )
+        .unwrap_err();
+
+        assert!(matches!(err, ToolboxError::InvalidArgument(_)));
+        assert_eq!(
+            std::fs::read_to_string(root.join("a/file.txt")).unwrap(),
+            "keep me"
+        );
+        std::fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn grep_uses_workspace_paths_and_honors_glob_for_files() {
+        let root = temp_workspace("grep-paths");
+        std::fs::create_dir_all(root.join("src")).unwrap();
+        std::fs::write(root.join("src/main.rs"), "fn main() {}\n").unwrap();
+
+        let grep = run_workspace_command(
+            &root,
+            &WorkspaceCommand::Grep {
+                path: Some("src".to_string()),
+                pattern: "fn".to_string(),
+                glob: Some("**/*.rs".to_string()),
+                max_results: 10,
+                max_file_bytes: 1024,
+                max_total_bytes: 4096,
+            },
+        )
+        .unwrap();
+        match grep {
+            WorkspaceCommandOutput::Grep { matches, truncated } => {
+                assert!(!truncated);
+                assert_eq!(matches.len(), 1);
+                assert_eq!(matches[0].path, "src/main.rs");
+            }
+            other => panic!("unexpected output: {other:?}"),
+        }
+
+        let grep = run_workspace_command(
+            &root,
+            &WorkspaceCommand::Grep {
+                path: Some("src/main.rs".to_string()),
+                pattern: "fn".to_string(),
+                glob: Some("**/*.md".to_string()),
+                max_results: 10,
+                max_file_bytes: 1024,
+                max_total_bytes: 4096,
+            },
+        )
+        .unwrap();
+        match grep {
+            WorkspaceCommandOutput::Grep { matches, truncated } => {
+                assert!(!truncated);
+                assert!(matches.is_empty());
+            }
+            other => panic!("unexpected output: {other:?}"),
+        }
+
+        std::fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn workspace_command_deserializes_camel_case_limits() {
+        let command: WorkspaceCommand = serde_json::from_str(
+            r#"{"command":"head","path":"src/main.rs","lines":20,"maxBytes":65536}"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            command,
+            WorkspaceCommand::Head {
+                path: "src/main.rs".to_string(),
+                lines: 20,
+                max_bytes: Some(65536),
+            }
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn ls_does_not_follow_symlinks_outside_workspace() {
+        let root = temp_workspace("ls-symlink");
+        let outside = temp_workspace("ls-symlink-outside");
+        std::fs::write(outside.join("secret.txt"), "secret").unwrap();
+        std::os::unix::fs::symlink(outside.join("secret.txt"), root.join("leak")).unwrap();
+
+        let ls = run_workspace_command(
+            &root,
+            &WorkspaceCommand::Ls {
+                path: None,
+                recursive: false,
+                max_entries: None,
+            },
+        )
+        .unwrap();
+
+        match ls {
+            WorkspaceCommandOutput::Ls { entries, truncated } => {
+                assert!(!truncated);
+                assert!(entries.is_empty());
+            }
+            other => panic!("unexpected output: {other:?}"),
+        }
+
+        std::fs::remove_dir_all(root).ok();
+        std::fs::remove_dir_all(outside).ok();
     }
 }
