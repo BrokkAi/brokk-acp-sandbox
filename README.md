@@ -77,8 +77,8 @@ cargo build --release --bin brokk-acp-sandbox --target wasm32-wasip2
 cp target/wasm32-wasip2/release/brokk-acp-sandbox.wasm wasm/brokk-acp-sandbox.wasm
 ```
 
-CI verifies the committed `.wasm` matches a fresh build so drift between the
-native library half and the sandboxed binary half cannot land unnoticed.
+CI verifies that the sandbox still builds for `wasm32-wasip2` and that both the
+fresh build and committed `.wasm` expose the expected JSON-RPC entry points.
 
 ## License
 
