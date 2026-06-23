@@ -44,11 +44,15 @@ jobs:
         run: cargo test
 
       # The published artifact is `wasm/brokk-acp-sandbox.wasm`, which
-      # is committed and shipped via `pub const WASM_BYTES`. Verify
-      # that the current source still cross-compiles to
-      # `wasm32-wasip2`. We don't byte-diff against the committed
-      # artifact (release builds aren't bit-reproducible across runners
-      # without pinning everything), but a build failure here is a
-      # clear "rebuild and re-commit the wasm before tagging" signal.
-      - name: Build sandbox for wasm32-wasip2
-        run: cargo build --release --bin brokk-acp-sandbox --target wasm32-wasip2
+      # is committed and shipped via `pub const WASM_BYTES`. Verify the
+      # source still builds for `wasm32-wasip2` and that both the fresh
+      # build and committed artifact expose the workspace command entry
+      # point. Raw release wasm bytes are not reproducible across all
+      # runners/toolchain environments, so CI avoids byte-for-byte cmp.
+      - name: Verify sandbox wasm artifact
+        run: |
+          cargo build --release --bin brokk-acp-sandbox --target wasm32-wasip2
+          test -s wasm/brokk-acp-sandbox.wasm
+          test -s target/wasm32-wasip2/release/brokk-acp-sandbox.wasm
+          grep -a -q 'runWorkspaceCommand' wasm/brokk-acp-sandbox.wasm
+          grep -a -q 'runWorkspaceCommand' target/wasm32-wasip2/release/brokk-acp-sandbox.wasm
